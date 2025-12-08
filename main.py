@@ -51,16 +51,21 @@ async def webhook_whatsapp(request: Request):
     
     # Verificando se o texto do usuário contém alguma saudação
     if re.match(saudacoes_regex, texto, re.IGNORECASE):
-        intro = (
+        menu = (
             "🌅 *Bom dia* 👋\n\n"
             "Sou o *Conectinha*, seu assistente virtual 🤖✨\n\n"
-            "Me avise como posso ajudar! 😊"
+            "👇 *Selecione uma opção enviando o número:*\n\n"
+            "1️⃣ Monitoramento\n"
+            "2️⃣ Planos\n"
+            "3️⃣ Dicas\n"
+            "4️⃣ Suporte\n\n"
+            "📌 Digite *menu* a qualquer momento."
         )
-        await send_whatsapp(numero, intro)
-        return {"status": "intro_sent"}
+        await send_whatsapp(numero, menu)
+        return {"status": "menu_sent"}
 
-    # Respostas de acordo com a opção
-    if "monitoramento" in texto.lower():
+    # Respostas de acordo com a opção do menu
+    if texto == "1":
         # Bot Ana - Monitoramento
         ANA_MONITORAMENTO_PROMPT = """
 Oi, sou a Ana, especialista em **Monitoramento**! 🤖
@@ -80,7 +85,7 @@ Se precisar de ajuda, estou aqui para te guiar! 😄
         await send_whatsapp(numero, ANA_MONITORAMENTO_PROMPT)
         return {"status": "monitoramento"}
 
-    if "planos" in texto.lower():
+    if texto == "2":
         # Bot Carlos - Planos
         CARLOS_PLANOS_PROMPT = """
 Oi, sou o Carlos, especialista em **Planos**! 😎
@@ -115,7 +120,7 @@ Se tiver mais alguma dúvida ou quiser assinar, é só me avisar!
         await send_whatsapp(numero, CARLOS_PLANOS_PROMPT)
         return {"status": "planos"}
 
-    if "dicas" in texto.lower():
+    if texto == "3":
         # Bot Leticia - Dicas
         LETICIA_DICAS_PROMPT = """
 Oi, sou a Letícia, especialista em **Dicas**! 📚
@@ -129,7 +134,7 @@ Se precisar de uma dica específica, é só me chamar e eu te ajudo!
         await send_whatsapp(numero, LETICIA_DICAS_PROMPT)
         return {"status": "dicas"}
 
-    if "suporte" in texto.lower():
+    if texto == "4":
         # Bot Rafael - Suporte
         RAFAEL_SUPORTE_PROMPT = """
 Oi, sou o Rafael, especialista em **Suporte**! 🛠️
