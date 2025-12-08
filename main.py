@@ -7,12 +7,11 @@ load_dotenv()
 
 app = FastAPI()
 
-# Carregar as variáveis do arquivo .env
+# Carregar variáveis de ambiente
 ZAPI_INSTANCE = os.getenv("ZAPI_INSTANCE_ID")
 ZAPI_TOKEN = os.getenv("ZAPI_TOKEN")
 ZAPI_CLIENT_TOKEN = os.getenv("ZAPI_CLIENT_TOKEN")
 
-# Definir o URL da Z-API para enviar as mensagens
 SEND_TEXT_URL = f"https://api.z-api.io/instances/{ZAPI_INSTANCE}/token/{ZAPI_TOKEN}/send-text"
 
 @app.get("/")
@@ -23,11 +22,9 @@ def home():
 # 📌 Função para enviar mensagem
 # ---------------------------
 async def send_whatsapp(numero, texto):
-    # Configuração do payload
     payload = {"phone": numero, "message": texto}
     headers = {"client-token": ZAPI_CLIENT_TOKEN}
 
-    # Envio da mensagem via Z-API
     async with httpx.AsyncClient() as client:
         await client.post(SEND_TEXT_URL, json=payload, headers=headers)
 
@@ -39,18 +36,52 @@ async def webhook_whatsapp(request: Request):
     data = await request.json()
     print("📥 RECEBIDO:", data)
 
-    # Se a mensagem foi enviada pelo próprio bot, ignorar
     if data.get("fromMe"):
         return {"status": "ignored"}
 
     numero = data.get("phone")
     texto = data.get("text", {}).get("message")
 
-    # Se não houver texto na mensagem, retornar sem fazer nada
     if not texto:
         return {"status": "no_text"}
 
-    # Resposta automática simples
-    await send_whatsapp(numero, "🤖 Recebido! Em breve vou te responder certinho!")
-    
-    return {"status": "ok", "msg": texto}
+    # Lógica do menu: Dependendo da opção, encaminha para diferentes atendentes
+    if texto.lower() in ["oi", "olá", "bom dia", "boa tarde", "boa noite"]:
+        menu = (
+            "🌅 *Bom dia* 👋\n\n"
+            "Sou o *Conectinha*, seu assistente virtual 🤖✨\n\n"
+            "👇 *Selecione uma opção enviando o número:*\n\n"
+            "1️⃣ Monitoramento\n"
+            "2️⃣ Planos\n"
+            "3️⃣ Dicas\n"
+            "4️⃣ Suporte\n"
+            "5️⃣ Outros\n\n"
+            "📌 Digite *menu* a qualquer momento."
+        )
+        await send_whatsapp(numero, menu)
+        return {"status": "menu_sent"}
+
+    # Exemplo de resposta a uma opção
+    if texto == "1":
+        await send_whatsapp(numero, "📊 Conectando você ao setor de *Monitoramento*...")
+        return {"status": "monitoramento"}
+
+    if texto == "2":
+        await send_whatsapp(numero, "💳 Conectando você ao setor de *Planos*...")
+        return {"status": "planos"}
+
+    if texto == "3":
+        await send_whatsapp(numero, "💡 Conectando ao setor de *Dicas*...")
+        return {"status": "dicas"}
+
+    if texto == "4":
+        await send_whatsapp(numero, "🛠️ Conectando ao setor de *Suporte*...")
+        return {"status": "suporte"}
+
+    if texto == "5":
+        await send_whatsapp(numero, "📌 Conectando ao setor de *Outros*...")
+        return {"status": "outros"}
+
+    # Fallback: caso o bot não reconheça a entrada
+    await send_whatsapp(numero, "🤖 Não entendi. Digite *menu* para ver as opções novamente.")
+    return {"status": "fallback"}
