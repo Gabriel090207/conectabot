@@ -2,7 +2,7 @@ from fastapi import FastAPI, Request
 import httpx
 import os
 from dotenv import load_dotenv
-import openai
+import re
 
 load_dotenv()
 
@@ -12,12 +12,16 @@ app = FastAPI()
 ZAPI_INSTANCE = os.getenv("ZAPI_INSTANCE_ID")
 ZAPI_TOKEN = os.getenv("ZAPI_TOKEN")
 ZAPI_CLIENT_TOKEN = os.getenv("ZAPI_CLIENT_TOKEN")
-OPENAI_API_KEY = os.getenv("OPENAI_API_KEY")
 
 SEND_TEXT_URL = f"https://api.z-api.io/instances/{ZAPI_INSTANCE}/token/{ZAPI_TOKEN}/send-text"
-openai.api_key = OPENAI_API_KEY
 
-# Função para enviar mensagem via WhatsApp
+@app.get("/")
+def home():
+    return {"status": "online", "bot": "ConectaBot"}
+
+# ---------------------------
+# 📌 Função para enviar mensagem
+# ---------------------------
 async def send_whatsapp(numero, texto):
     payload = {"phone": numero, "message": texto}
     headers = {"client-token": ZAPI_CLIENT_TOKEN}
@@ -26,52 +30,7 @@ async def send_whatsapp(numero, texto):
         await client.post(SEND_TEXT_URL, json=payload, headers=headers)
 
 # ---------------------------
-# Definir os Prompts dos atendentes (com base nas opções)
-# ---------------------------
-
-PROMPT_MONITORAMENTO = """
-Você é um assistente técnico de monitoramento da plataforma.
-Seu papel é guiar o usuário para criar um novo monitoramento, responder dúvidas sobre como configurar, e fornecer detalhes do processo.
-
-Quando o usuário diz que não sabe como criar um monitoramento, você deve explicar passo a passo:
-1. Como fazer login.
-2. Onde acessar a opção de "Novo Monitoramento".
-3. O que é necessário preencher (link do diário oficial, id do edital).
-4. Explicar que o monitoramento é criado após o preenchimento desses campos.
-"""
-
-PROMPT_PLANOS = """
-Você é um atendente humano da área de planos.
-Seu papel é ajudar o usuário a entender os diferentes planos, suas vantagens e o que está incluso em cada um.
-Nunca force uma venda, apenas explique de maneira clara as opções e valores.
-
-Responda de forma natural e simples.
-"""
-
-PROMPT_DICAS = """
-Você é um assistente do setor de dicas.
-Seu papel é ajudar o usuário com dicas sobre como utilizar a plataforma, configurar ferramentas, e obter o melhor desempenho nas ferramentas disponíveis.
-
-Responda de forma amigável, com uma explicação clara e simples.
-"""
-
-PROMPT_SUPORTE = """
-Você é um atendente humano do suporte.
-Seu papel é tirar dúvidas sobre o uso da plataforma, ajudar a solucionar problemas de acesso e fornecer informações de ajuda.
-
-Você deve se comportar de forma amigável, com respostas rápidas e úteis, sem ser robótico.
-Sempre que possível, ofereça links úteis para solução de problemas.
-"""
-
-# ---------------------------
-# Rota para Home
-# ---------------------------
-@app.get("/")
-def home():
-    return {"status": "online", "bot": "ConectaBot"}
-
-# ---------------------------
-# Webhook Recebendo mensagem
+# 📌 Webhook Recebendo mensagem
 # ---------------------------
 @app.post("/api/webhook-whatsapp")
 async def webhook_whatsapp(request: Request):
@@ -87,8 +46,11 @@ async def webhook_whatsapp(request: Request):
     if not texto:
         return {"status": "no_text"}
 
-    # Menu de opções
-    if texto.lower() in ["oi", "olá", "bom dia", "boa tarde", "boa noite"]:
+    # Regex para detectar saudações, como "oi", "olá", "bom dia", etc.
+    saudacoes_regex = r"^(opa|oi|olá|bom dia|boa tarde|boa noite|eai|fala|salve|hello|hi|hey|oiê|alô|tudo bem).*$"
+    
+    # Verificando se o texto do usuário contém alguma saudação
+    if re.match(saudacoes_regex, texto, re.IGNORECASE):
         menu = (
             "🌅 *Bom dia* 👋\n\n"
             "Sou o *Conectinha*, seu assistente virtual 🤖✨\n\n"
@@ -96,44 +58,117 @@ async def webhook_whatsapp(request: Request):
             "1️⃣ Monitoramento\n"
             "2️⃣ Planos\n"
             "3️⃣ Dicas\n"
-            "4️⃣ Suporte\n"
-            "5️⃣ Outros\n\n"
+            "4️⃣ Suporte\n\n"
             "📌 Digite *menu* a qualquer momento."
         )
         await send_whatsapp(numero, menu)
         return {"status": "menu_sent"}
 
-    # Respostas para cada opção
+    # Respostas de acordo com a opção
     if texto == "1":
-        await send_whatsapp(numero, "📊 Conectando você ao setor de *Monitoramento*... Aguardando um momento.")
-        # Aqui, você pode colocar o nome do bot de monitoramento
-        bot_name = "Carlos, seu assistente de Monitoramento"
-        await send_whatsapp(numero, f"{bot_name}: Olá! Eu sou o Carlos, seu assistente de Monitoramento. Como posso te ajudar? Se não souber como começar, basta pedir ajuda que explico todo o processo!")
+        # Bot Ana - Monitoramento
+        ANA_MONITORAMENTO_PROMPT = """
+Oi, sou a Ana, especialista em **Monitoramento**! 🤖
+
+Aqui, temos dois tipos de monitoramento disponíveis:
+1. **Radar**: Monitora todos os PDFs que têm o ID colocado no monitoramento.
+2. **Pessoal**: Monitora os PDFs que possuem o ID + nome da pessoa.
+
+**Como criar um monitoramento:**
+1. Faça o login no portal.
+2. Na aba de "Monitoramentos", clique em "Novo Monitoramento" ou "Criar Primeiro Monitoramento" caso não tenha nenhum.
+3. Escolha o tipo de monitoramento (Radar ou Pessoal).
+4. Preencha as informações, como o **link do diário oficial** e o **ID do edital**.
+
+Se for um monitoramento **Pessoal**, o nome já é fixo de acordo com o nome do perfil. Se quiser mudar o nome, é necessário abrir um ticket na aba de "Suporte".
+
+**Planos e Limitações**:
+- **Sem Plano**: 0 slots (você não pode criar monitoramento).
+- **Plano Essencial**: 3 slots.
+- **Plano Premium**: Slots ilimitados.
+
+**Notificações**:
+- Usuários **Premium** recebem notificações de novas ocorrências tanto no **WhatsApp** quanto no **E-mail**.
+- Usuários do **Plano Essencial** recebem notificações apenas **no E-mail**.
+
+**Edição**: Para editar o nome do monitoramento, clique no ícone de lápis ao lado do nome. Você pode também configurar o link e o ID do monitoramento.
+
+Se precisar de algo, estou aqui para te ajudar! 😄
+"""
+
+        await send_whatsapp(numero, ANA_MONITORAMENTO_PROMPT)
         return {"status": "monitoramento"}
 
     if texto == "2":
-        await send_whatsapp(numero, "💳 Conectando você ao setor de *Planos*... Aguardando um momento.")
-        bot_name = "Sofia, especialista em Planos"
-        await send_whatsapp(numero, f"{bot_name}: Olá! Eu sou a Sofia, especialista nos planos disponíveis. Como posso te ajudar a escolher o melhor plano para você?")
+        # Bot Carlos - Planos
+        CARLOS_PLANOS_PROMPT = """
+Oi, sou o Carlos, especialista em **Planos**! 😎
+
+Aqui estão os planos disponíveis:
+
+1. **Plano Essencial**:
+   - **Preço**: R$ 15.90/mês
+   - **Benefícios**:
+     - 3 monitoramentos
+     - E-mail instantâneo para atualizações
+     - Suporte técnico
+     - Dashboard de acompanhamento
+     - Histórico de publicações (últimos 30 dias)
+   - **Notificação**: Só recebe **notificação por e-mail**.
+
+2. **Plano Premium**:
+   - **Preço**: R$ 35.90/mês
+   - **Benefícios**:
+     - Monitoramentos ilimitados
+     - E-mail + WhatsApp para notificações
+     - Suporte prioritário
+     - Acesso antecipado a novas funcionalidades
+     - Análise de IA aprimorada
+   - **Notificação**: Recebe **notificação por e-mail** e **WhatsApp**.
+
+**Como assinar o plano**:
+- Para assinar, vá para a aba de **Planos** no site e escolha o seu plano. 💳
+
+Se tiver mais alguma dúvida ou quiser assinar, é só me avisar!
+"""
+
+        await send_whatsapp(numero, CARLOS_PLANOS_PROMPT)
         return {"status": "planos"}
 
     if texto == "3":
-        await send_whatsapp(numero, "💡 Conectando ao setor de *Dicas*... Aguardando um momento.")
-        bot_name = "Lucas, assistente de Dicas"
-        await send_whatsapp(numero, f"{bot_name}: Olá! Eu sou o Lucas, e estou aqui para te ajudar com dicas de como aproveitar ao máximo a plataforma. Como posso te ajudar?")
+        # Bot Leticia - Dicas
+        LETICIA_DICAS_PROMPT = """
+Oi, sou a Letícia, especialista em **Dicas**! 📚
+
+As **dicas** são postadas regularmente no nosso site e podem variar desde dicas de estudos até dicas para otimização de monitoramentos e ferramentas.
+
+Você pode conferir todas as dicas atualizadas [aqui](https://siteconectaedital.netlify.app/).
+
+Se precisar de uma dica específica, é só me chamar e eu te ajudo!
+"""
+
+        await send_whatsapp(numero, LETICIA_DICAS_PROMPT)
         return {"status": "dicas"}
 
     if texto == "4":
-        await send_whatsapp(numero, "🛠️ Conectando você ao setor de *Suporte*... Aguardando um momento.")
-        bot_name = "Mariana, atendente de Suporte"
-        await send_whatsapp(numero, f"{bot_name}: Olá! Eu sou a Mariana, atendente de Suporte. Como posso te ajudar? Qualquer dúvida ou problema, estou aqui para ajudar!")
-        return {"status": "suporte"}
+        # Bot Rafael - Suporte
+        RAFAEL_SUPORTE_PROMPT = """
+Oi, sou o Rafael, especialista em **Suporte**! 🛠️
 
-    if texto == "5":
-        await send_whatsapp(numero, "📌 Conectando ao setor de *Outros*... Aguardando um momento.")
-        bot_name = "Victor, atendente de Outros"
-        await send_whatsapp(numero, f"{bot_name}: Olá! Eu sou o Victor, e estou aqui para ajudar em qualquer outra dúvida ou necessidade. Em que posso te ajudar?")
-        return {"status": "outros"}
+Se você tem algum problema ou dúvida, posso te ajudar a abrir um **ticket de suporte** no nosso site.
+
+Aqui está como fazer:
+1. Vá até a aba **Suporte** no site.
+2. Clique em **Abrir Novo Chamado**.
+3. Escolha uma **categoria** para o seu problema.
+4. Dê um **título** para o chamado e descreva **detalhadamente** o problema.
+5. Aguarde que um de nossos atendentes irá te responder.
+
+Sempre que precisar, estou por aqui para te ajudar! 😄
+"""
+
+        await send_whatsapp(numero, RAFAEL_SUPORTE_PROMPT)
+        return {"status": "suporte"}
 
     # Fallback: caso o bot não reconheça a entrada
     await send_whatsapp(numero, "🤖 Não entendi. Digite *menu* para ver as opções novamente.")
