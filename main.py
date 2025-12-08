@@ -1,8 +1,10 @@
 from fastapi import FastAPI, Request
 import httpx
 import os
+import asyncio
 from dotenv import load_dotenv
 
+# Carregar as variáveis de ambiente
 load_dotenv()
 
 app = FastAPI()
@@ -17,9 +19,7 @@ SEND_TEXT_URL = f"https://api.z-api.io/instances/{ZAPI_INSTANCE}/token/{ZAPI_TOK
 def home():
     return {"status": "online", "bot": "ConectaBot"}
 
-# ---------------------------
-# 📌 Função para enviar msg
-# ---------------------------
+# Função para enviar a mensagem
 async def send_whatsapp(numero, texto):
     payload = {"phone": numero, "message": texto}
     headers = {"client-token": ZAPI_CLIENT_TOKEN}
@@ -27,24 +27,26 @@ async def send_whatsapp(numero, texto):
     async with httpx.AsyncClient() as client:
         await client.post(SEND_TEXT_URL, json=payload, headers=headers)
 
-# ---------------------------
-# 📌 Webhook Recebendo msg
-# ---------------------------
+# Função de webhook para receber mensagens
 @app.post("/webhook-whatsapp")
 async def webhook_whatsapp(request: Request):
     data = await request.json()
     print("📥 RECEBIDO:", data)
 
+    # Se for uma mensagem enviada pelo próprio bot, ignoramos
     if data.get("fromMe"):
         return {"status": "ignored"}
 
     numero = data.get("phone")
-    texto = data.get("text", {}).get("message")
+    
+    # Verificar se a chave 'text' existe e se contém uma mensagem
+    texto = data.get("text", {}).get("message", "").strip()
 
     if not texto:
         return {"status": "no_text"}
 
-    # Resposta automática simples por enquanto
+    # Enviar uma resposta automática (pode ser um tempo de espera simulando um bot)
+    await asyncio.sleep(1)  # Simula um pequeno delay antes de enviar a resposta
     await send_whatsapp(numero, "🤖 Recebido! Em breve vou te responder certinho!")
-    
+
     return {"status": "ok", "msg": texto}
