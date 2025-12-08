@@ -47,25 +47,20 @@ async def webhook_whatsapp(request: Request):
         return {"status": "no_text"}
 
     # Regex para detectar saudações, como "oi", "olá", "bom dia", etc.
-    saudacoes_regex = r"^(opa|oi|olá|bom dia|boa tarde|boa noite|eai|fala|salve|hello|hi|hey|oiê|alô|tudo bem).*$"
+    saudacoes_regex = r"^(oi|olá|bom dia|boa tarde|boa noite|eai|fala|salve|hello|hi|hey|oiê|alô|tudo bem).*$"
     
     # Verificando se o texto do usuário contém alguma saudação
     if re.match(saudacoes_regex, texto, re.IGNORECASE):
-        menu = (
+        intro = (
             "🌅 *Bom dia* 👋\n\n"
             "Sou o *Conectinha*, seu assistente virtual 🤖✨\n\n"
-            "👇 *Selecione uma opção enviando o número:*\n\n"
-            "1️⃣ Monitoramento\n"
-            "2️⃣ Planos\n"
-            "3️⃣ Dicas\n"
-            "4️⃣ Suporte\n\n"
-            "📌 Digite *menu* a qualquer momento."
+            "Me avise como posso ajudar! 😊"
         )
-        await send_whatsapp(numero, menu)
-        return {"status": "menu_sent"}
+        await send_whatsapp(numero, intro)
+        return {"status": "intro_sent"}
 
     # Respostas de acordo com a opção
-    if texto == "1":
+    if "monitoramento" in texto.lower():
         # Bot Ana - Monitoramento
         ANA_MONITORAMENTO_PROMPT = """
 Oi, sou a Ana, especialista em **Monitoramento**! 🤖
@@ -74,32 +69,18 @@ Aqui, temos dois tipos de monitoramento disponíveis:
 1. **Radar**: Monitora todos os PDFs que têm o ID colocado no monitoramento.
 2. **Pessoal**: Monitora os PDFs que possuem o ID + nome da pessoa.
 
-**Como criar um monitoramento:**
+**Como criar um monitoramento**:
 1. Faça o login no portal.
 2. Na aba de "Monitoramentos", clique em "Novo Monitoramento" ou "Criar Primeiro Monitoramento" caso não tenha nenhum.
 3. Escolha o tipo de monitoramento (Radar ou Pessoal).
 4. Preencha as informações, como o **link do diário oficial** e o **ID do edital**.
 
-Se for um monitoramento **Pessoal**, o nome já é fixo de acordo com o nome do perfil. Se quiser mudar o nome, é necessário abrir um ticket na aba de "Suporte".
-
-**Planos e Limitações**:
-- **Sem Plano**: 0 slots (você não pode criar monitoramento).
-- **Plano Essencial**: 3 slots.
-- **Plano Premium**: Slots ilimitados.
-
-**Notificações**:
-- Usuários **Premium** recebem notificações de novas ocorrências tanto no **WhatsApp** quanto no **E-mail**.
-- Usuários do **Plano Essencial** recebem notificações apenas **no E-mail**.
-
-**Edição**: Para editar o nome do monitoramento, clique no ícone de lápis ao lado do nome. Você pode também configurar o link e o ID do monitoramento.
-
-Se precisar de algo, estou aqui para te ajudar! 😄
+Se precisar de ajuda, estou aqui para te guiar! 😄
 """
-
         await send_whatsapp(numero, ANA_MONITORAMENTO_PROMPT)
         return {"status": "monitoramento"}
 
-    if texto == "2":
+    if "planos" in texto.lower():
         # Bot Carlos - Planos
         CARLOS_PLANOS_PROMPT = """
 Oi, sou o Carlos, especialista em **Planos**! 😎
@@ -131,11 +112,10 @@ Aqui estão os planos disponíveis:
 
 Se tiver mais alguma dúvida ou quiser assinar, é só me avisar!
 """
-
         await send_whatsapp(numero, CARLOS_PLANOS_PROMPT)
         return {"status": "planos"}
 
-    if texto == "3":
+    if "dicas" in texto.lower():
         # Bot Leticia - Dicas
         LETICIA_DICAS_PROMPT = """
 Oi, sou a Letícia, especialista em **Dicas**! 📚
@@ -146,11 +126,10 @@ Você pode conferir todas as dicas atualizadas [aqui](https://siteconectaedital.
 
 Se precisar de uma dica específica, é só me chamar e eu te ajudo!
 """
-
         await send_whatsapp(numero, LETICIA_DICAS_PROMPT)
         return {"status": "dicas"}
 
-    if texto == "4":
+    if "suporte" in texto.lower():
         # Bot Rafael - Suporte
         RAFAEL_SUPORTE_PROMPT = """
 Oi, sou o Rafael, especialista em **Suporte**! 🛠️
@@ -166,7 +145,6 @@ Aqui está como fazer:
 
 Sempre que precisar, estou por aqui para te ajudar! 😄
 """
-
         await send_whatsapp(numero, RAFAEL_SUPORTE_PROMPT)
         return {"status": "suporte"}
 
