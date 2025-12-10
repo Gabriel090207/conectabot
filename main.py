@@ -37,6 +37,59 @@ async def send_whatsapp(numero, texto):
 SUPORTE_BASE = """
 📌 BASE INTERNA DO SUPORTE CONECTA EDITAL
 
+
+🟢 Slots (monitoramentos)
+- Cada monitoramento ocupa 1 slot.
+
+⚪ Sem plano
+- 0 slots disponíveis.
+
+🟡 Essencial
+- 3 slots (até 3 monitoramentos).
+
+🔵 Premium
+- Slots ilimitados.
+
+🟢 Nova ocorrência
+- Quando sai um novo PDF no diário monitorado com o conteúdo do monitoramento.
+
+🟡 Radar
+- Notifica se o PDF tiver o ID configurado.
+
+🔵 Pessoal
+- Notifica somente se tiver ID + Nome no mesmo PDF.
+
+🟢 Nome no monitoramento pessoal
+- O nome usado vem do cadastro inicial do usuário.
+
+🟣 Alteração de nome
+- Mudança só via ticket no suporte.
+
+🟢 Notificação por plano
+- Essencial: só Email
+- Premium: Email + WhatsApp
+
+🟣 Premium — R$ 39,90
+- Monitoramentos ilimitados
+- Email + WhatsApp
+- Suporte prioritário
+- Acesso antecipado
+- IA aprimorada
+
+🟡 Essencial — R$ 19,90
+- 3 monitoramentos
+- Notificação por email
+- Dashboard
+- Histórico 30 dias
+
+🟢 Editar monitoramento
+- Clique em "Configurar".
+
+🖊 Alterar nome do monitoramento
+- Clique no ícone do lápis ao lado do nome.
+
+
+Há dois tipos de monitoramentos, o radar e o pessoal
 RADAR:
 - Notifica quando o ID aparece no PDF.
 
@@ -134,13 +187,13 @@ async def webhook_whatsapp(request: Request):
     # ======================================================
     if re.match(r"^(oi|olá|bom dia|boa tarde|boa noite|e ai|fala|hey|salve|menu).*$", texto, re.IGNORECASE):
         menu = (
-            "Olá 👋 Tudo bem?\n\n"
-            "Escolha com quem deseja falar:\n\n"
+            "Olá, Sou a Conectinha, seu assistente virtual!🤖\n\n"
+            "👇 Escolha com quem deseja falar:\n\n"
             "1️⃣ Ana - Monitoramento\n"
             "2️⃣ Carlos - Planos\n"
             "3️⃣ Letícia - Dicas\n"
             "4️⃣ Rafael - Suporte Técnico\n\n"
-            "Digite o número:"
+            "📌 Digite o número do atendente para começar o atendimento:"
         )
         await send_whatsapp(numero, menu)
         return {"status": "menu_inicial"}
