@@ -3,35 +3,118 @@ import httpx
 import os
 from dotenv import load_dotenv
 import re
+from openai import OpenAI
 
 load_dotenv()
 
 app = FastAPI()
 
-# Carregar variáveis de ambiente
+# CREDENCIAIS
 ZAPI_INSTANCE = os.getenv("ZAPI_INSTANCE_ID")
 ZAPI_TOKEN = os.getenv("ZAPI_TOKEN")
 ZAPI_CLIENT_TOKEN = os.getenv("ZAPI_CLIENT_TOKEN")
+OPENAI_API_KEY = os.getenv("OPENAI_API_KEY")
 
 SEND_TEXT_URL = f"https://api.z-api.io/instances/{ZAPI_INSTANCE}/token/{ZAPI_TOKEN}/send-text"
 
-@app.get("/")
-def home():
-    return {"status": "online", "bot": "ConectaBot"}
+client = OpenAI(api_key=OPENAI_API_KEY)
 
-# ---------------------------
-# 📌 Função para enviar mensagem
-# ---------------------------
+
+# ==========================================================
+# 📌 ENVIAR WHATSAPP
+# ==========================================================
 async def send_whatsapp(numero, texto):
     payload = {"phone": numero, "message": texto}
     headers = {"client-token": ZAPI_CLIENT_TOKEN}
 
-    async with httpx.AsyncClient() as client:
-        await client.post(SEND_TEXT_URL, json=payload, headers=headers)
+    async with httpx.AsyncClient() as client_http:
+        await client_http.post(SEND_TEXT_URL, json=payload, headers=headers)
 
-# ---------------------------
-# 📌 Webhook Recebendo mensagem
-# ---------------------------
+
+# ==========================================================
+# 📌 BASE DE CONHECIMENTO
+# ==========================================================
+SUPORTE_BASE = """
+📌 BASE INTERNA DO SUPORTE CONECTA EDITAL
+
+RADAR:
+- Notifica quando o ID aparece no PDF.
+
+PESSOAL:
+- Exige ID + NOME completo no PDF.
+- Se só ID aparece → não notifica (correto).
+
+HASH:
+- Se não houve alteração no PDF → não dispara notificação.
+
+NOTIFICAÇÕES:
+- Essencial = Email
+- Premium = Email + WhatsApp
+
+HORÁRIOS:
+- 05:45 e 23:45
+
+FALHAS COMUNS:
+- Nome não consta no PDF → pessoal não notifica
+- PDF igual ao anterior → sem alerta
+
+WHATSAPP:
+- Só premium recebe.
+
+EMAIL:
+- Todos os planos.
+
+PDF QUE NÃO ABRE DIRETO:
+- Alguns diários têm link interno do PDF → normal.
+
+REGRA DO SUPORTE:
+- Resposta sempre curta, direta e humana.
+"""
+
+
+# ==========================================================
+# 📌 IA HUMANIZADA
+# ==========================================================
+async def gerar_resposta(texto_usuario, personagem):
+    prompt = f"""
+Você é {personagem}, atendente humano do suporte Conecta Edital.
+
+REGRAS:
+- Responda curto, gentil e claro.
+- Nunca dê textão.
+- Não vender nada.
+- Não criar monitoramento.
+- Só tirar a dúvida.
+- Se não for claro, peça detalhe.
+
+BASE CONHECIMENTO:
+{SUPORTE_BASE}
+
+Usuário perguntou:
+{texto_usuario}
+
+Resposta:
+"""
+
+    resposta = client.chat.completions.create(
+        model="gpt-4.1-mini",
+        messages=[{"role": "system", "content": prompt}]
+    )
+
+    return resposta.choices[0].message.content.strip()
+
+
+# ==========================================================
+# 📌 HOME
+# ==========================================================
+@app.get("/")
+def home():
+    return {"status": "online", "bot": "Suporte Conecta"}
+
+
+# ==========================================================
+# 📌 WEBHOOK WHATSAPP
+# ==========================================================
 @app.post("/api/webhook-whatsapp")
 async def webhook_whatsapp(request: Request):
     data = await request.json()
@@ -46,113 +129,40 @@ async def webhook_whatsapp(request: Request):
     if not texto:
         return {"status": "no_text"}
 
-    # Regex para detectar saudações, como "oi", "olá", "bom dia", etc.
-    saudacoes_regex = r"^(oi|olá|bom dia|boa tarde|boa noite|eai|fala|salve|hello|hi|hey|oiê|alô|tudo bem).*$"
-    
-    # Verificando se o texto do usuário contém alguma saudação
-    if re.match(saudacoes_regex, texto, re.IGNORECASE):
+    # ======================================================
+    # 👋 SAUDAÇÃO INICIAL COM MENU (SEM TEXTÃO)
+    # ======================================================
+    if re.match(r"^(oi|olá|bom dia|boa tarde|boa noite|e ai|fala|hey|salve|menu).*$", texto, re.IGNORECASE):
         menu = (
-            "🌅 *Bom dia* 👋\n\n"
-            "Sou o *Conectinha*, seu assistente virtual 🤖✨\n\n"
-            "👇 *Selecione uma opção enviando o número:*\n\n"
-            "1️⃣ Monitoramento\n"
-            "2️⃣ Planos\n"
-            "3️⃣ Dicas\n"
-            "4️⃣ Suporte\n\n"
-            "📌 Digite *menu* a qualquer momento."
+            "Olá 👋 Tudo bem?\n\n"
+            "Escolha com quem deseja falar:\n\n"
+            "1️⃣ Ana - Monitoramento\n"
+            "2️⃣ Carlos - Planos\n"
+            "3️⃣ Letícia - Dicas\n"
+            "4️⃣ Rafael - Suporte Técnico\n\n"
+            "Digite o número:"
         )
         await send_whatsapp(numero, menu)
-        return {"status": "menu_sent"}
+        return {"status": "menu_inicial"}
 
-    # Respostas de acordo com a opção do menu
-    if texto == "1":
-        # Bot Ana - Monitoramento
-        ANA_MONITORAMENTO_PROMPT = """
-Oi, sou a Ana, especialista em **Monitoramento**! 🤖
+    # ======================================================
+    # 🤖 ATENDENTES ENTRAM (PERSONAS)
+    # ======================================================
+    personagens = {
+        "1": "Ana, especialista em monitoramento",
+        "2": "Carlos, especialista em planos",
+        "3": "Letícia, especialista em dicas e orientações",
+        "4": "Rafael, suporte técnico"
+    }
 
-Aqui, temos dois tipos de monitoramento disponíveis:
-1. **Radar**: Monitora todos os PDFs que têm o ID colocado no monitoramento.
-2. **Pessoal**: Monitora os PDFs que possuem o ID + nome da pessoa.
+    if texto in personagens:
+        await send_whatsapp(numero, f"Olá! Eu sou {personagens[texto].split(',')[0]} 😊\nComo posso te ajudar?")
+        return {"status": f"personagem_{texto}"}
 
-**Como criar um monitoramento**:
-1. Faça o login no portal.
-2. Na aba de "Monitoramentos", clique em "Novo Monitoramento" ou "Criar Primeiro Monitoramento" caso não tenha nenhum.
-3. Escolha o tipo de monitoramento (Radar ou Pessoal).
-4. Preencha as informações, como o **link do diário oficial** e o **ID do edital**.
-
-Se precisar de ajuda, estou aqui para te guiar! 😄
-"""
-        await send_whatsapp(numero, ANA_MONITORAMENTO_PROMPT)
-        return {"status": "monitoramento"}
-
-    if texto == "2":
-        # Bot Carlos - Planos
-        CARLOS_PLANOS_PROMPT = """
-Oi, sou o Carlos, especialista em **Planos**! 😎
-
-Aqui estão os planos disponíveis:
-
-1. **Plano Essencial**:
-   - **Preço**: R$ 15.90/mês
-   - **Benefícios**:
-     - 3 monitoramentos
-     - E-mail instantâneo para atualizações
-     - Suporte técnico
-     - Dashboard de acompanhamento
-     - Histórico de publicações (últimos 30 dias)
-   - **Notificação**: Só recebe **notificação por e-mail**.
-
-2. **Plano Premium**:
-   - **Preço**: R$ 35.90/mês
-   - **Benefícios**:
-     - Monitoramentos ilimitados
-     - E-mail + WhatsApp para notificações
-     - Suporte prioritário
-     - Acesso antecipado a novas funcionalidades
-     - Análise de IA aprimorada
-   - **Notificação**: Recebe **notificação por e-mail** e **WhatsApp**.
-
-**Como assinar o plano**:
-- Para assinar, vá para a aba de **Planos** no site e escolha o seu plano. 💳
-
-Se tiver mais alguma dúvida ou quiser assinar, é só me avisar!
-"""
-        await send_whatsapp(numero, CARLOS_PLANOS_PROMPT)
-        return {"status": "planos"}
-
-    if texto == "3":
-        # Bot Leticia - Dicas
-        LETICIA_DICAS_PROMPT = """
-Oi, sou a Letícia, especialista em **Dicas**! 📚
-
-As **dicas** são postadas regularmente no nosso site e podem variar desde dicas de estudos até dicas para otimização de monitoramentos e ferramentas.
-
-Você pode conferir todas as dicas atualizadas [aqui](https://siteconectaedital.netlify.app/).
-
-Se precisar de uma dica específica, é só me chamar e eu te ajudo!
-"""
-        await send_whatsapp(numero, LETICIA_DICAS_PROMPT)
-        return {"status": "dicas"}
-
-    if texto == "4":
-        # Bot Rafael - Suporte
-        RAFAEL_SUPORTE_PROMPT = """
-Oi, sou o Rafael, especialista em **Suporte**! 🛠️
-
-Se você tem algum problema ou dúvida, posso te ajudar a abrir um **ticket de suporte** no nosso site.
-
-Aqui está como fazer:
-1. Vá até a aba **Suporte** no site.
-2. Clique em **Abrir Novo Chamado**.
-3. Escolha uma **categoria** para o seu problema.
-4. Dê um **título** para o chamado e descreva **detalhadamente** o problema.
-5. Aguarde que um de nossos atendentes irá te responder.
-
-Sempre que precisar, estou por aqui para te ajudar! 😄
-"""
-        await send_whatsapp(numero, RAFAEL_SUPORTE_PROMPT)
-        return {"status": "suporte"}
-
-    # Fallback: caso o bot não reconheça a entrada
-    await send_whatsapp(numero, "🤖 Não entendi. Digite *menu* para ver as opções novamente.")
-    return {"status": "fallback"}
+    # ======================================================
+    # 🧠 SE NÃO ESCOLHE PERSONAGEM → IA RESPONDE CURTO
+    # ======================================================
+    # A IA assume e responde como o último personagem chamado (fallback geral)
+    resposta = await gerar_resposta(texto, "atendente do suporte")
+    await send_whatsapp(numero, resposta)
+    return {"status": "ia_respondeu"}
