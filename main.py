@@ -69,14 +69,14 @@ SUPORTE_BASE = """
 - Essencial: só Email
 - Premium: Email + WhatsApp
 
-🟣 Premium — R$ 39,90
+🟣 Premium — R$ 35,90
 - Monitoramentos ilimitados
 - Email + WhatsApp
 - Suporte prioritário
 - Acesso antecipado
 - IA aprimorada
 
-🟡 Essencial — R$ 19,90
+🟡 Essencial — R$ 15,90
 - 3 monitoramentos
 - Notificação por email
 - Dashboard
